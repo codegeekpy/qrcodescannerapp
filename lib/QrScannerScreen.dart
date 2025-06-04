@@ -41,16 +41,50 @@ class _QrScannerScreenState extends State<QrScannerScreen>
     }
   }
 
-  Future<void> _checkCameraPermission() async {
-    final status = await Permission.camera.status;
-    if (status.isGranted) {
-      setState(() => hasPermission = true);
-    } else if (status.isPermanentlyDenied) {
-      await openAppSettings(); // Direct user to app settings
-    }
-     else {
-      final result = await Permission.camera.request();
-      setState(() => hasPermission = result.isGranted);
+ Future<void> _checkCameraPermission() async {
+    try {
+      final status = await Permission.camera.status;
+
+      if (status.isGranted) {
+        setState(() => hasPermission = true);
+      } else if (status.isDenied) {
+        final result = await Permission.camera.request();
+        setState(() => hasPermission = result.isGranted);
+
+        if (!hasPermission) {
+          // Show explanation why permission is needed
+          if (await Permission.camera.shouldShowRequestRationale) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Permission Required'),
+                content: const Text('Camera access is needed to scan QR codes'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await openAppSettings();
+                    },
+                    child: const Text('Open Settings'),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+      } else if (status.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     }
   }
 
